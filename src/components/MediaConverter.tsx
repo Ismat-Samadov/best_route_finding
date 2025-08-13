@@ -51,7 +51,11 @@ export default function MediaConverter() {
     try {
       const ffmpegInstance = new FFmpeg();
       
-      const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm';
+      // Try multiple CDN sources for better reliability
+      const cdnSources = [
+        'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd',
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd'
+      ];
       
       ffmpegInstance.on('log', ({ message }) => {
         console.log(message);
@@ -67,11 +71,24 @@ export default function MediaConverter() {
         }
       });
 
-      await ffmpegInstance.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-      });
+      let loaded = false;
+      for (const baseURL of cdnSources) {
+        try {
+          await ffmpegInstance.load({
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          });
+          loaded = true;
+          break;
+        } catch (cdnError) {
+          console.warn(`Failed to load from ${baseURL}:`, cdnError);
+          continue;
+        }
+      }
+
+      if (!loaded) {
+        throw new Error('Failed to load FFmpeg from all CDN sources');
+      }
 
       setFFmpeg(ffmpegInstance);
       setLoaded(true);
@@ -81,13 +98,27 @@ export default function MediaConverter() {
       setConversion({ 
         status: 'error', 
         progress: 0, 
-        message: 'Failed to load FFmpeg. Please refresh and try again.' 
+        message: 'Failed to load FFmpeg. This may be due to browser restrictions. Try using Chrome or Firefox.' 
       });
     }
   };
 
+  const checkBrowserSupport = () => {
+    if (typeof SharedArrayBuffer === 'undefined') {
+      setConversion({ 
+        status: 'error', 
+        progress: 0, 
+        message: 'Your browser does not support SharedArrayBuffer. Please use Chrome, Firefox, or Safari with HTTPS.' 
+      });
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
-    load();
+    if (checkBrowserSupport()) {
+      load();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,6 +305,20 @@ export default function MediaConverter() {
               {conversion.status === 'converting' ? 'Converting...' : 'Convert to MP4'}
             </button>
 
+            {conversion.status === 'error' && (
+              <button
+                onClick={() => {
+                  setConversion({ status: 'idle', progress: 0, message: '' });
+                  if (checkBrowserSupport()) {
+                    load();
+                  }
+                }}
+                className="py-3 px-6 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors duration-200"
+              >
+                Retry Loading
+              </button>
+            )}
+
             {convertedVideoUrl && (
               <button
                 onClick={handleDownload}
@@ -342,6 +387,30 @@ export default function MediaConverter() {
             </div>
           ))}
         </div>
+
+        {/* Browser Compatibility Notice */}
+        {conversion.status === 'error' && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-8">
+            <h4 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+              Browser Compatibility Issue
+            </h4>
+            <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-3">
+              {conversion.message}
+            </p>
+            <div className="text-sm text-yellow-600 dark:text-yellow-400">
+              <p className="mb-2"><strong>Recommended browsers:</strong></p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Chrome 68+ (with HTTPS)</li>
+                <li>Firefox 79+ (with HTTPS)</li>
+                <li>Safari 15.2+ (with HTTPS)</li>
+                <li>Edge 88+ (with HTTPS)</li>
+              </ul>
+              <p className="mt-3 text-xs">
+                Note: This application requires SharedArrayBuffer support and must be served over HTTPS.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="text-center text-gray-500 dark:text-gray-400 text-sm">
