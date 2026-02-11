@@ -20,8 +20,8 @@ export default function Home() {
     lat: number;
     lng: number;
   } | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [searching, setSearching] = useState(false);
+  // Mobile: "search" = form panel, "map" = map panel
+  const [mobileView, setMobileView] = useState<"search" | "map">("search");
 
   useEffect(() => {
     fetch("/api/stops")
@@ -48,10 +48,8 @@ export default function Home() {
         return;
       }
       setRoute(data.route);
-      // On mobile, auto-collapse sidebar to show the map with route
-      if (window.innerWidth < 1024) {
-        setSidebarOpen(false);
-      }
+      // On mobile, switch to map view to show the route
+      setMobileView("map");
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -104,20 +102,18 @@ export default function Home() {
 
   return (
     <div className="app-layout">
-      {/* Sidebar */}
-      <aside className={`sidebar ${!sidebarOpen ? "collapsed" : ""} ${searching ? "searching" : ""}`}>
+      {/* Sidebar / Form panel */}
+      <aside className={`sidebar ${mobileView !== "search" ? "hidden-view" : ""}`}>
         <div className="sidebar-header">
           <h1>Baku Bus Route Planner</h1>
           <p>Find the best bus routes across Baku</p>
         </div>
 
         <div className="sidebar-body">
-          {/* Location */}
           <div className="form-section">
             <LocationButton onLocationFound={handleLocationFound} />
           </div>
 
-          {/* From */}
           <div className="form-section">
             <StopSearch
               label="From"
@@ -126,12 +122,9 @@ export default function Home() {
               selectedStop={fromStop}
               onSelect={setFromStop}
               dotColor="green"
-              onSearchFocus={() => setSearching(true)}
-              onSearchBlur={() => setSearching(false)}
             />
           </div>
 
-          {/* Swap */}
           <div className="form-section" style={{ textAlign: "center" }}>
             <button className="swap-btn" onClick={handleSwapStops} title="Swap stops">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -140,7 +133,6 @@ export default function Home() {
             </button>
           </div>
 
-          {/* To */}
           <div className="form-section">
             <StopSearch
               label="To"
@@ -149,12 +141,9 @@ export default function Home() {
               selectedStop={toStop}
               onSelect={setToStop}
               dotColor="red"
-              onSearchFocus={() => setSearching(true)}
-              onSearchBlur={() => setSearching(false)}
             />
           </div>
 
-          {/* Find Button */}
           <div className="form-section">
             <button
               className="primary-btn"
@@ -172,34 +161,14 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Error */}
           {error && <div className="error-msg">{error}</div>}
 
-          {/* Result */}
           {route && <JourneyCard route={route} />}
         </div>
       </aside>
 
-      {/* Mobile toggle */}
-      <button
-        className="mobile-toggle"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        aria-label={sidebarOpen ? "Close panel" : "Open search"}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          {sidebarOpen ? (
-            <path d="M6 18L18 6M6 6l12 12" />
-          ) : (
-            <>
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.35-4.35" />
-            </>
-          )}
-        </svg>
-      </button>
-
-      {/* Map */}
-      <div className="map-wrapper">
+      {/* Map panel */}
+      <div className={`map-wrapper ${mobileView !== "map" ? "hidden-view" : ""}`}>
         <MapView
           stops={stops}
           fromStop={fromStop}
@@ -209,6 +178,31 @@ export default function Home() {
           onStopClick={handleMapStopClick}
         />
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="mobile-tab-bar">
+        <button
+          className={mobileView === "search" ? "active" : ""}
+          onClick={() => setMobileView("search")}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          Search
+        </button>
+        <button
+          className={mobileView === "map" ? "active" : ""}
+          onClick={() => setMobileView("map")}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z" />
+            <path d="M8 2v16" />
+            <path d="M16 6v16" />
+          </svg>
+          Map
+        </button>
+      </nav>
     </div>
   );
 }

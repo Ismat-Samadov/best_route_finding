@@ -10,8 +10,6 @@ interface StopSearchProps {
   selectedStop: StopDetail | null;
   onSelect: (stop: StopDetail | null) => void;
   dotColor: "green" | "red";
-  onSearchFocus?: () => void;
-  onSearchBlur?: () => void;
 }
 
 export default function StopSearch({
@@ -21,8 +19,6 @@ export default function StopSearch({
   selectedStop,
   onSelect,
   dotColor,
-  onSearchFocus,
-  onSearchBlur,
 }: StopSearchProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -38,7 +34,6 @@ export default function StopSearch({
       .slice(0, 20);
   }, [query, stops]);
 
-  // Close dropdown when tapping outside
   useEffect(() => {
     function handleOutside(e: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -53,7 +48,6 @@ export default function StopSearch({
     };
   }, []);
 
-  // Scroll dropdown into view when results appear
   useEffect(() => {
     if (isOpen && filtered.length > 0 && dropdownRef.current) {
       setTimeout(() => {
@@ -68,9 +62,8 @@ export default function StopSearch({
       setQuery("");
       setIsOpen(false);
       inputRef.current?.blur();
-      onSearchBlur?.();
     },
-    [onSelect, onSearchBlur]
+    [onSelect]
   );
 
   return (
@@ -106,19 +99,7 @@ export default function StopSearch({
               setQuery(e.target.value);
               setIsOpen(true);
             }}
-            onFocus={() => {
-              setIsOpen(true);
-              onSearchFocus?.();
-              setTimeout(() => {
-                inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }, 350);
-            }}
-            onBlur={() => {
-              // Delay blur to allow dropdown tap to register
-              setTimeout(() => {
-                onSearchBlur?.();
-              }, 200);
-            }}
+            onFocus={() => setIsOpen(true)}
             placeholder={placeholder}
             className="search-input"
           />
