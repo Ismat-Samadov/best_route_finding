@@ -185,8 +185,8 @@ html, body {
     margin-bottom: 14px;
   }
 
-  .dropdown {
-    max-height: 180px;
+  .dropdown-inline {
+    max-height: 160px;
   }
 
   .dropdown-item {
@@ -323,17 +323,17 @@ html, body {
   color: #ef4444;
 }
 
-.dropdown {
-  position: absolute;
-  z-index: 100;
+/* Inline dropdown: flows in document, not absolute — avoids overflow clipping */
+.dropdown-inline {
   width: 100%;
   margin-top: 4px;
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-  max-height: 220px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  max-height: 200px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .dropdown-item {
@@ -344,14 +344,15 @@ html, body {
   background: none;
   cursor: pointer;
   border-bottom: 1px solid #f1f5f9;
-  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dropdown-item:last-child {
   border-bottom: none;
 }
 
-.dropdown-item:hover {
+.dropdown-item:hover,
+.dropdown-item:active {
   background: #eff6ff;
 }
 
