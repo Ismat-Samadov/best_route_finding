@@ -79,3 +79,7 @@ export interface RouteResult {
 }
 
 export type OptimizationMode = "shortest" | "fastest" | "balanced";
+
+// Special bus ID indicating a walking transfer (not a bus ride)
+export const WALKING_EDGE_BUS_ID = -1;
+export const WALKING_EDGE_BUS_NUMBER = "walk";

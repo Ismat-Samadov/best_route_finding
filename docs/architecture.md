@@ -11,8 +11,8 @@
 │  │  (Leaflet)   │  │  (React)     │  │  (React useState)      ││
 │  │              │  │              │  │                          ││
 │  │ - Stop pins  │  │ - Search     │  │ - Selected stops        ││
-│  │ - Route lines│  │ - Stop list  │  │ - Route results         ││
-│  │ - User loc.  │  │ - Route cards│  │ - User location         ││
+│  │ - Route lines│  │ - Stop list  │  │ - Route result          ││
+│  │ - Walk paths │  │ - Journey    │  │ - User location         ││
 │  └──────┬───────┘  └──────┬───────┘  └────────────┬───────────┘│
 │         └──────────────────┴──────────────────────┘             │
 │                            │ HTTP                               │
@@ -27,7 +27,7 @@
 │  │  GET /api/stops         - All stops with coordinates     │   │
 │  │  GET /api/stops/nearby  - Stops near a location          │   │
 │  │  GET /api/buses         - All bus lines                  │   │
-│  │  POST /api/routes/find  - Compute optimal routes         │   │
+│  │  POST /api/routes/find  - Compute optimal route           │   │
 │  │  GET /api/routes/[id]   - Route coordinates for display  │   │
 │  └─────────────────────────┬───────────────────────────────┘   │
 │                            │                                    │
@@ -97,10 +97,9 @@ best_route_finding/
 │   │   ├── geo.ts                  # Geospatial utilities
 │   │   └── types.ts                # TypeScript type definitions
 │   └── components/
-│       ├── Map.tsx                  # Main map component
+│       ├── Map.tsx                  # Map with route visualization
 │       ├── StopSearch.tsx           # Stop search/selection
-│       ├── RouteResults.tsx         # Route result cards
-│       ├── RouteCard.tsx            # Individual route display
+│       ├── JourneyCard.tsx          # Route timeline (bus + walk)
 │       └── LocationButton.tsx       # Geolocation button
 ├── public/
 │   └── marker-icon.png             # Custom map markers
@@ -125,14 +124,16 @@ best_route_finding/
 
 **GraphService (`graph.ts`):**
 - Constructs the bus network graph from database records
+- Builds walking transfer edges between nearby stops (within 300m)
 - Maintains adjacency list representation
 - Caches the graph in memory (rebuilt on server restart)
 - Provides edge lookup and neighbor iteration
 
 **RoutingService (`routing.ts`):**
 - Implements modified Dijkstra's algorithm with transfer tracking
-- Implements Yen's K-shortest paths for top-3 results
-- Supports multiple optimization modes (distance, time, transfers)
+- Uses Yen's K-shortest paths (k=1 for single best route)
+- Balanced optimization mode: 0.3*distance + 0.5*time + 0.2*transfer
+- Handles walking segments (busId=-1) distinctly from bus segments
 - Returns structured route results with segments, stops, and metrics
 
 **GeoService (`geo.ts`):**
@@ -147,22 +148,24 @@ best_route_finding/
 
 ### 4. Frontend Layer (`src/components/`)
 - Interactive map using Leaflet (open-source, no API key needed)
+- Color-coded route segments with dashed walking paths
 - React components for user interaction
 - Client-side state management with React hooks
-- Responsive design with Tailwind CSS
+- Tab-based mobile layout (Search / Map views)
 
 ## Data Flow: Route Finding Request
 
 ```
 1. User selects start stop and destination stop on map/search
-2. Frontend sends POST /api/routes/find { fromStopId, toStopId, mode }
+2. Frontend sends POST /api/routes/find { fromStopId, toStopId }
 3. API route handler validates input
 4. RoutingService checks if graph is built (lazy initialization)
-5. If not built: GraphService queries DB, constructs graph, caches it
-6. RoutingService runs Yen's K=3 shortest paths
-7. For each result path, fetch route_coordinates for map rendering
-8. Return structured JSON with routes, stops, segments, metrics
-9. Frontend renders routes on map and in result cards
+5. If not built: GraphService queries DB, constructs graph + walking edges, caches it
+6. RoutingService runs Dijkstra (balanced mode) to find optimal route
+7. Route may include walking segments (busId=-1) between nearby stops
+8. Return structured JSON with single route (segments, stops, metrics)
+9. Frontend renders route on map (solid lines for bus, dashed for walking)
+   and in JourneyCard timeline
 ```
 
 ## Deployment Architecture (Vercel)

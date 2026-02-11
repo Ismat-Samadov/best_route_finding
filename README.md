@@ -5,11 +5,11 @@ A production-ready web application for finding optimal public bus routes across 
 ## Features
 
 - **Interactive Map** - Browse all 3,400+ bus stops on an OpenStreetMap-based map
-- **Smart Route Finding** - Computes top 3 optimal routes between any two stops
-- **Multiple Optimization Modes** - Shortest distance, fastest time, or balanced
-- **Transfer Detection** - Automatically identifies where to change buses
+- **Smart Route Finding** - Computes the optimal route between any two stops using a balanced multi-objective algorithm
+- **Walking Transfers** - Suggests short walks (up to 300m) between nearby stops to find better routes
+- **Transfer Detection** - Automatically identifies where to change buses with distinct color-coded segments
 - **Geolocation** - Detect your location and find the nearest bus stop
-- **Mobile-Responsive** - Works on desktop, tablet, and phone
+- **Mobile-Responsive** - Tab-based layout (Search / Map) optimized for touch devices
 - **207 Bus Lines** - Full coverage of BakuBus network
 
 ## Tech Stack
@@ -18,7 +18,7 @@ A production-ready web application for finding optimal public bus routes across 
 |-------|-----------|
 | Frontend | Next.js 16, React 19, Tailwind CSS 4 |
 | Map | Leaflet + react-leaflet |
-| Routing Engine | Custom Dijkstra + Yen's K-shortest paths |
+| Routing Engine | Custom Dijkstra + Yen's K-shortest paths + walking transfers |
 | Database | PostgreSQL (Neon Serverless) |
 | Deployment | Vercel |
 
@@ -77,15 +77,14 @@ src/
 │       └── routes/geometry/route.ts # GET /api/routes/geometry
 ├── lib/
 │   ├── db.ts                       # Database queries
-│   ├── graph.ts                    # Transit graph construction
+│   ├── graph.ts                    # Transit graph with walking edges
 │   ├── routing.ts                  # Dijkstra + Yen's algorithms
 │   ├── geo.ts                      # Haversine distance calculations
 │   └── types.ts                    # TypeScript type definitions
 └── components/
-    ├── Map.tsx                     # Interactive Leaflet map
+    ├── Map.tsx                     # Interactive Leaflet map with route visualization
     ├── StopSearch.tsx              # Stop search autocomplete
-    ├── RouteResults.tsx            # Route results container
-    ├── RouteCard.tsx               # Individual route display card
+    ├── JourneyCard.tsx             # Route timeline with bus/walk segments
     └── LocationButton.tsx          # Geolocation button
 ```
 
@@ -129,42 +128,43 @@ Returns all bus lines with metadata.
 
 ### POST /api/routes/find
 
-Compute optimal routes between two stops.
+Compute the optimal route between two stops.
 
 **Request Body:**
 ```json
 {
   "fromStopId": 1439,
-  "toStopId": 631,
-  "mode": "balanced"
+  "toStopId": 631
 }
 ```
-
-**Modes:** `shortest`, `fastest`, `balanced`
 
 **Response:**
 ```json
 {
   "from": { "id": 1439, "name": "Neftciler m/st" },
   "to": { "id": 631, "name": "Qara Qarayev m/st" },
-  "mode": "balanced",
-  "routes": [
-    {
-      "segments": [
-        {
-          "busId": 1,
-          "busNumber": "1",
-          "stops": [...],
-          "distance": 2.5,
-          "time": 8.2
-        }
-      ],
-      "totalDistance": 2.5,
-      "totalTime": 8.2,
-      "totalTransfers": 0,
-      "totalStops": 5
-    }
-  ]
+  "route": {
+    "segments": [
+      {
+        "busId": 1,
+        "busNumber": "1",
+        "stops": [...],
+        "distance": 2.5,
+        "time": 8.2
+      },
+      {
+        "busId": -1,
+        "busNumber": "walk",
+        "stops": [...],
+        "distance": 0.15,
+        "time": 2.0
+      }
+    ],
+    "totalDistance": 2.65,
+    "totalTime": 10.2,
+    "totalTransfers": 0,
+    "totalStops": 5
+  }
 }
 ```
 
@@ -180,12 +180,12 @@ Get GPS polyline coordinates for a route.
 
 ## Routing Algorithm
 
-The routing engine uses a **Modified Dijkstra's algorithm** combined with **Yen's K-Shortest Paths** to find the top 3 routes:
+The routing engine uses a **Modified Dijkstra's algorithm** with **walking transfer edges** to find the best route:
 
-1. **Graph Model:** Bus stops are nodes, consecutive stops on bus routes are directed edges
-2. **Multi-objective Cost:** Distance + time + transfer penalty (weighted by mode)
+1. **Graph Model:** Bus stops are nodes; consecutive stops on bus routes are directed edges; nearby stops (within 300m) are connected by bidirectional walking edges
+2. **Multi-objective Cost:** `0.3 * distance + 0.5 * time + 0.2 * transfer_penalty` (balanced mode)
 3. **Transfer Tracking:** State includes current bus ID to detect transfers
-4. **K-Shortest Paths:** Yen's algorithm computes 3 diverse route alternatives
+4. **Walking Transfers:** The algorithm can suggest short walks between nearby stops to avoid long detours
 
 See [docs/routing-algorithm.md](docs/routing-algorithm.md) for detailed pseudocode and complexity analysis.
 

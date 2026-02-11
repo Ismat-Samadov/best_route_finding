@@ -51,7 +51,7 @@ vercel --prod
 ## Performance Notes
 
 - **Cold Start:** First request after deployment builds the transit graph (~2-5s). Subsequent requests use cached graph.
-- **Graph Size:** ~3,444 nodes, ~11,000 edges. Fits easily in serverless function memory.
+- **Graph Size:** ~3,444 nodes, ~11,000+ edges (bus routes + walking transfers). Fits easily in serverless function memory.
 - **Database Queries:** Uses Neon serverless driver optimized for edge/serverless with HTTP-based queries.
 - **Static Assets:** Served via Vercel's global CDN.
 

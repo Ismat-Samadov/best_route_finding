@@ -555,6 +555,35 @@ html, body {
   color: #64748b;
 }
 
+/* Walking segment in timeline */
+.timeline-line.walking::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--seg-color, #64748b) 0px,
+    var(--seg-color, #64748b) 4px,
+    transparent 4px,
+    transparent 10px
+  );
+}
+
+.timeline-walk {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  margin: 4px 0;
+}
+
+.walk-detail {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
 /* ===== MAP MARKERS ===== */
 .map-marker-start,
 .map-marker-end,

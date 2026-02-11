@@ -1,6 +1,9 @@
-import { GraphEdge, StopDetail, Bus, BusStop } from "./types";
+import { GraphEdge, StopDetail, Bus, BusStop, WALKING_EDGE_BUS_ID, WALKING_EDGE_BUS_NUMBER } from "./types";
 import { haversine } from "./geo";
 import { queryStopDetails, queryBuses, queryBusStops } from "./db";
+
+const WALK_RADIUS_KM = 0.3; // 300 meters
+const WALK_SPEED_KMH = 4.5; // average walking speed
 
 export class TransitGraph {
   private adjacency: Map<number, GraphEdge[]> = new Map();
@@ -61,16 +64,14 @@ export class TransitGraph {
       groupedStops.get(key)!.push(bs);
     }
 
-    // Build edges from consecutive stops
+    // Build edges from consecutive stops on each bus route
     for (const [key, stops] of groupedStops.entries()) {
       const busId = parseInt(key.split(":")[0]);
       const bus = this.busInfo.get(busId);
       if (!bus) continue;
 
-      // Sort by bus_stop_id (ordinal position)
       stops.sort((a, b) => a.bus_stop_id - b.bus_stop_id);
 
-      // Estimate per-segment time
       const segmentCount = Math.max(stops.length - 1, 1);
       const segmentTime = (bus.duration_minuts || 30) / segmentCount;
 
@@ -114,11 +115,85 @@ export class TransitGraph {
       }
     }
 
+    // Build walking transfer edges between nearby stops (within 300m)
+    // Use a simple spatial approach: for each stop, find nearby stops
+    const stopsArray = Array.from(this.stopInfo.values());
+    let walkingEdges = 0;
+
+    // Build a set of which stops are served by which buses
+    const stopBuses = new Map<number, Set<number>>();
+    for (const bs of busStops) {
+      if (!stopBuses.has(bs.stop_id)) {
+        stopBuses.set(bs.stop_id, new Set());
+      }
+      stopBuses.get(bs.stop_id)!.add(bs.bus_id);
+    }
+
+    for (let i = 0; i < stopsArray.length; i++) {
+      const stopA = stopsArray[i];
+      const busesA = stopBuses.get(stopA.id);
+
+      for (let j = i + 1; j < stopsArray.length; j++) {
+        const stopB = stopsArray[j];
+
+        // Quick lat/lng filter before expensive haversine (0.3km ≈ 0.003 degrees)
+        if (Math.abs(stopA.latitude - stopB.latitude) > 0.004) continue;
+        if (Math.abs(stopA.longitude - stopB.longitude) > 0.005) continue;
+
+        const dist = haversine(
+          stopA.latitude, stopA.longitude,
+          stopB.latitude, stopB.longitude
+        );
+
+        if (dist > WALK_RADIUS_KM) continue;
+
+        // Only add walking edge if the two stops serve different bus routes
+        // (no point walking between two stops on the same route)
+        const busesB = stopBuses.get(stopB.id);
+        if (busesA && busesB) {
+          let hasDifferentBus = false;
+          for (const b of busesB) {
+            if (!busesA.has(b)) {
+              hasDifferentBus = true;
+              break;
+            }
+          }
+          if (!hasDifferentBus) continue;
+        }
+
+        const walkTime = (dist / WALK_SPEED_KMH) * 60; // minutes
+
+        // Add bidirectional walking edges
+        const edgeAB: GraphEdge = {
+          toStopId: stopB.id,
+          busId: WALKING_EDGE_BUS_ID,
+          busNumber: WALKING_EDGE_BUS_NUMBER,
+          distance: dist,
+          time: walkTime,
+          fromStopName: stopA.name,
+          toStopName: stopB.name,
+        };
+
+        const edgeBA: GraphEdge = {
+          toStopId: stopA.id,
+          busId: WALKING_EDGE_BUS_ID,
+          busNumber: WALKING_EDGE_BUS_NUMBER,
+          distance: dist,
+          time: walkTime,
+          fromStopName: stopB.name,
+          toStopName: stopA.name,
+        };
+
+        this.adjacency.get(stopA.id)!.push(edgeAB);
+        this.adjacency.get(stopB.id)!.push(edgeBA);
+        walkingEdges += 2;
+      }
+    }
+
     this.built = true;
+    const totalEdges = Array.from(this.adjacency.values()).reduce((sum, edges) => sum + edges.length, 0);
     console.log(
-      `Graph built: ${this.adjacency.size} nodes, ${
-        Array.from(this.adjacency.values()).reduce((sum, edges) => sum + edges.length, 0)
-      } edges`
+      `Graph built: ${this.adjacency.size} nodes, ${totalEdges} edges (${walkingEdges} walking)`
     );
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { RouteResult } from "@/lib/types";
+import { WALKING_EDGE_BUS_ID } from "@/lib/types";
 
 // Must match SEGMENT_COLORS in Map.tsx
 const SEGMENT_COLORS = ["#e11d48", "#7c3aed", "#059669", "#ea580c"];
@@ -13,6 +14,12 @@ export default function JourneyCard({ route }: JourneyCardProps) {
   const firstStop = route.segments[0]?.stops[0];
   const lastSeg = route.segments[route.segments.length - 1];
   const lastStop = lastSeg?.stops[lastSeg.stops.length - 1];
+
+  const busSegments = route.segments.filter((s) => s.busId !== WALKING_EDGE_BUS_ID);
+  const busCount = busSegments.length;
+
+  // Color index tracks only bus segments (walking segments don't consume a color)
+  let busColorIdx = 0;
 
   return (
     <div className="journey-card">
@@ -28,10 +35,10 @@ export default function JourneyCard({ route }: JourneyCardProps) {
         </div>
         <div className="journey-stat">
           <span className="journey-stat-value">
-            {route.segments.length === 1 ? "Direct" : `${route.segments.length} buses`}
+            {busCount === 1 ? "Direct" : `${busCount} buses`}
           </span>
           <span className="journey-stat-label">
-            {route.segments.length === 1 ? "no transfer" : `${route.totalTransfers} transfer${route.totalTransfers > 1 ? "s" : ""}`}
+            {route.totalTransfers === 0 ? "no transfer" : `${route.totalTransfers} transfer${route.totalTransfers > 1 ? "s" : ""}`}
           </span>
         </div>
       </div>
@@ -47,24 +54,45 @@ export default function JourneyCard({ route }: JourneyCardProps) {
           </div>
         </div>
 
-        {/* Each bus segment */}
+        {/* Each segment (bus or walking) */}
         {route.segments.map((segment, idx) => {
-          const color = SEGMENT_COLORS[idx % SEGMENT_COLORS.length];
+          const isWalking = segment.busId === WALKING_EDGE_BUS_ID;
+          const color = isWalking ? "#64748b" : SEGMENT_COLORS[busColorIdx % SEGMENT_COLORS.length];
+          if (!isWalking) busColorIdx++;
+
+          const distMeters = Math.round(segment.distance * 1000);
+
           return (
             <div key={idx}>
-              {/* Bus ride */}
+              {/* Segment line */}
               <div className="timeline-row">
-                <div className="timeline-line" style={{ "--seg-color": color } as React.CSSProperties} />
-                <div className="timeline-bus" style={{ borderColor: color, background: `${color}10` }}>
-                  <span className="bus-number" style={{ color }}>Bus {segment.busNumber}</span>
-                  <span className="bus-detail">
-                    {segment.stops.length} stops &middot; {segment.distance.toFixed(1)} km &middot; {Math.round(segment.time)} min
-                  </span>
-                </div>
+                <div
+                  className={`timeline-line${isWalking ? " walking" : ""}`}
+                  style={{ "--seg-color": color } as React.CSSProperties}
+                />
+                {isWalking ? (
+                  <div className="timeline-walk">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="5" r="2" />
+                      <path d="M10 22l2-7 3 3v6" />
+                      <path d="M10 13l-1.5-4.5L13 7l2 4" />
+                    </svg>
+                    <span className="walk-detail">
+                      Walk {Math.round(segment.time)} min ({distMeters}m)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="timeline-bus" style={{ borderColor: color, background: `${color}10` }}>
+                    <span className="bus-number" style={{ color }}>Bus {segment.busNumber}</span>
+                    <span className="bus-detail">
+                      {segment.stops.length} stops &middot; {segment.distance.toFixed(1)} km &middot; {Math.round(segment.time)} min
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* Transfer */}
-              {idx < route.segments.length - 1 && (
+              {/* Transfer point between segments (skip if next is walking or current is walking) */}
+              {idx < route.segments.length - 1 && !isWalking && route.segments[idx + 1].busId !== WALKING_EDGE_BUS_ID && (
                 <div className="timeline-row">
                   <div className="timeline-dot transfer" />
                   <div className="timeline-content">

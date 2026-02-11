@@ -7,14 +7,19 @@
 The Baku bus network is modeled as a **weighted directed multigraph** G = (V, E):
 
 - **Vertices (V):** Each physical bus stop from `stop_details` (3,444 stops)
-- **Edges (E):** Directed connections between consecutive stops on a bus route
-  - An edge exists from stop A to stop B if they are consecutive stops on any bus line in the same direction
-  - Multiple edges may exist between two stops (served by different bus lines) = multigraph
+- **Edges (E):** Two types of directed edges:
+  1. **Bus edges:** Consecutive stops on a bus route (same direction)
+     - Multiple edges may exist between two stops (served by different bus lines) = multigraph
+  2. **Walking edges:** Bidirectional connections between nearby stops (within 300m)
+     - Only between stops served by different bus routes
+     - busId = -1, busNumber = "walk"
+     - Walk speed: 4.5 km/h
 - **Edge Weights:** Multi-objective (distance, time, transfers)
 
 ### Graph Construction
 
 ```
+// Step 1: Bus route edges
 For each bus B in buses:
   For each direction D in [1, 2]:
     stops = SELECT * FROM bus_stops
@@ -28,6 +33,17 @@ For each bus B in buses:
           bus_number: B.number
           distance: haversine(stops[i], stops[i+1])
           segment_time: estimated from total duration
+
+// Step 2: Walking transfer edges (O(n²) with spatial pre-filter)
+For each pair of stops (A, B):
+  if |A.lat - B.lat| > 0.004: skip  // quick filter (~400m)
+  if |A.lng - B.lng| > 0.005: skip
+  dist = haversine(A, B)
+  if dist > 0.3 km: skip
+  if A and B serve only the same bus routes: skip
+  walkTime = (dist / 4.5) * 60  // minutes
+  Add bidirectional edges: A <-> B
+    with busId=-1, busNumber="walk", distance=dist, time=walkTime
 ```
 
 ### Edge Weight Computation
@@ -59,24 +75,22 @@ For each bus B in buses:
 - Time complexity: O((V + E) log V) with binary heap
 
 **Modification for Multi-Objective Optimization:**
-We run Dijkstra's with a composite cost function that can be parameterized:
+We run Dijkstra's with a composite cost function (balanced mode):
 
 ```
-cost(edge) = α * distance + β * time + γ * transfer_penalty
+cost(edge) = 0.3 * distance + 0.5 * time + 0.2 * transfer_penalty
 
-Where:
-  - Mode "shortest": α=1, β=0, γ=0
-  - Mode "fastest":  α=0, β=1, γ=0
-  - Mode "fewest_transfers": α=0, β=0, γ=1
-  - Mode "balanced": α=0.3, β=0.5, γ=0.2
+Transfer penalty: 10 units applied when changing bus lines
+Walking edges: treated as regular edges with their distance/time cost
+  (walking between nearby stops avoids long bus detours)
 ```
 
-### Secondary: Yen's K-Shortest Paths
+### Secondary: Yen's K-Shortest Paths (available, currently k=1)
 
 **Why Yen's:**
-- We need the top 3 optimal routes, not just one
-- Yen's algorithm efficiently computes K-shortest loopless paths
+- Can compute diverse alternative routes if needed in future
 - Built on top of Dijkstra's as a subroutine
+- Currently runs with k=1 (single best route) for simplicity
 - Time complexity: O(K * V * (V + E) log V)
 
 **Algorithm Overview:**
@@ -106,7 +120,7 @@ function buildGraph(busStops, stopDetails, buses):
   for each stop in stopDetails:
     stopCoords[stop.id] = {lat: float(stop.latitude), lng: float(stop.longitude)}
 
-  // Build edges from bus stop sequences
+  // Step 1: Build bus route edges
   for each bus in buses:
     stopsForward = busStops.filter(bs => bs.bus_id == bus.id && bs.direction_type_id == 1)
                            .sortBy(bs => bs.bus_stop_id)
@@ -128,9 +142,21 @@ function buildGraph(busStops, stopDetails, buses):
       })
 
     // Repeat for direction 2 (return)
-    stopsReturn = busStops.filter(bs => bs.bus_id == bus.id && bs.direction_type_id == 2)
-                          .sortBy(bs => bs.bus_stop_id)
-    // ... same edge construction ...
+
+  // Step 2: Build walking transfer edges
+  stopBuses = Map<stopId, Set<busId>>  // which buses serve each stop
+  for each bs in busStops:
+    stopBuses[bs.stop_id].add(bs.bus_id)
+
+  for each pair (stopA, stopB) in stopDetails:
+    if |stopA.lat - stopB.lat| > 0.004: continue  // quick filter
+    if |stopA.lng - stopB.lng| > 0.005: continue
+    dist = haversine(stopA, stopB)
+    if dist > 0.3: continue  // 300m radius
+    if stopBuses[A] == stopBuses[B]: continue  // same buses, no point
+    walkTime = (dist / 4.5) * 60  // minutes at 4.5 km/h
+    graph.addEdge(A, B, { busId: -1, busNumber: "walk", dist, walkTime })
+    graph.addEdge(B, A, { busId: -1, busNumber: "walk", dist, walkTime })
 
   return graph
 ```
@@ -252,12 +278,13 @@ function reconstructPath(prev, targetKey, sourceId):
   if currentSegment != null:
     segments.unshift(currentSegment)
 
+  busSegments = segments.filter(s => s.busId != -1)
   return {
-    segments: segments,
+    segments: segments,  // includes both bus and walking segments
     totalDistance: sum(s.distance for s in segments),
     totalTime: sum(s.time for s in segments),
-    totalTransfers: segments.length - 1,
-    stops: flatMap(s.stops for s in segments)
+    totalTransfers: max(0, busSegments.length - 1),  // walking doesn't count
+    stops: flatMap(s.stops for s in busSegments)
   }
 ```
 
@@ -273,31 +300,32 @@ function reconstructPath(prev, targetKey, sourceId):
 
 **With our data:**
 - V = 3,444 stops
-- E ≈ 11,702 edges (from bus_stops sequences)
-- K = 3
+- E ≈ 11,702 bus edges + walking edges (from bus_stops sequences + nearby stop pairs within 300m)
+- K = 1 (single best route)
 - Single Dijkstra: ~50ms estimated
-- K=3 Yen's: ~200ms estimated
 
-The graph is small enough that performance is not a concern for real-time queries.
+The graph is small enough that performance is not a concern for real-time queries. Walking edge construction is O(n²) but uses a quick lat/lng pre-filter to skip most pairs.
 
 ---
 
 ## Transfer Detection Strategy
 
-Two stops are considered "transfer-capable" if:
-1. They share the same `stop_id` in `stop_details` (same physical stop)
-2. They are served by different bus lines (different `bus_id` in `bus_stops`)
+Transfers happen in two ways:
 
-The transfer is implicit in the graph: when Dijkstra reaches a stop node, it can continue on any outgoing edge, including edges from different bus lines. The transfer penalty is applied when the bus_id changes.
+1. **Same-stop transfer:** When Dijkstra reaches a stop served by multiple bus lines, it can continue on any outgoing edge. A transfer penalty is applied when the bus_id changes.
+
+2. **Walking transfer:** When two stops from different bus routes are within 300m, a walking edge connects them. The user walks between stops to access a different bus line. Walking segments use `busId = -1` and are displayed as dashed lines on the map with a walking icon in the timeline.
+
+Transfer counting: Only bus-to-bus changes count as transfers. Walking segments are displayed as intermediate steps but don't increment the transfer counter on their own — only the number of distinct bus segments minus one counts.
 
 ---
 
-## Optimization Modes (User-Facing)
+## Optimization Mode
 
-| Mode | Prioritizes | Use Case |
-|------|------------|----------|
-| Shortest Distance | Minimum km traveled | Fuel/environmental optimization |
-| Fastest | Minimum estimated time | Commuter efficiency |
-| Fewest Transfers | Minimum bus changes | Convenience, accessibility |
+The application uses a single **balanced** mode that optimizes for a combination of distance, time, and transfer convenience:
 
-The API returns top 3 routes. Each route is computed with the selected optimization mode, returning diverse alternatives via Yen's K-shortest paths algorithm.
+```
+cost = 0.3 * distance + 0.5 * time + 0.2 * transfer_penalty
+```
+
+The API returns a single best route. The routing engine supports other modes internally (`shortest`, `fastest`) but only `balanced` is exposed to users for simplicity.

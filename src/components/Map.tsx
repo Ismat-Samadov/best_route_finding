@@ -12,6 +12,7 @@ import {
   useMap,
 } from "react-leaflet";
 import type { StopDetail, RouteResult } from "@/lib/types";
+import { WALKING_EDGE_BUS_ID } from "@/lib/types";
 
 const BAKU_CENTER: [number, number] = [40.4093, 49.8671];
 const DEFAULT_ZOOM = 12;
@@ -99,28 +100,35 @@ export default function MapView({
   // Build per-segment polylines with distinct colors
   const segmentPolylines = useMemo(() => {
     if (!route) return [];
-    return route.segments.map((seg, idx) => {
+    let busColorIdx = 0;
+    return route.segments.map((seg) => {
+      const isWalking = seg.busId === WALKING_EDGE_BUS_ID;
       const coords: [number, number][] = seg.stops.map((s) => [s.latitude, s.longitude]);
+      const color = isWalking ? "#64748b" : SEGMENT_COLORS[busColorIdx % SEGMENT_COLORS.length];
+      if (!isWalking) busColorIdx++;
       return {
         coords,
-        color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
+        color,
         busNumber: seg.busNumber,
+        isWalking,
       };
     });
   }, [route]);
 
-  // Transfer points: where user changes buses
+  // Transfer points: where user changes buses (skip walking segments)
   const transferPoints = useMemo(() => {
     if (!route || route.segments.length <= 1) return [];
-    const points: Array<{ lat: number; lng: number; fromBus: string; toBus: string; stopName: string }> = [];
-    for (let i = 0; i < route.segments.length - 1; i++) {
-      const lastStop = route.segments[i].stops[route.segments[i].stops.length - 1];
+    const points: Array<{ lat: number; lng: number; fromBus: string; toBus: string; stopName: string; colorIdx: number }> = [];
+    const busSegs = route.segments.filter((s) => s.busId !== WALKING_EDGE_BUS_ID);
+    for (let i = 0; i < busSegs.length - 1; i++) {
+      const lastStop = busSegs[i].stops[busSegs[i].stops.length - 1];
       points.push({
         lat: lastStop.latitude,
         lng: lastStop.longitude,
-        fromBus: route.segments[i].busNumber,
-        toBus: route.segments[i + 1].busNumber,
+        fromBus: busSegs[i].busNumber,
+        toBus: busSegs[i + 1].busNumber,
         stopName: lastStop.name,
+        colorIdx: i,
       });
     }
     return points;
@@ -208,17 +216,18 @@ export default function MapView({
         );
       })}
 
-      {/* Route polylines — each segment a different bold color */}
+      {/* Route polylines — each segment a different bold color, walking = dashed */}
       {segmentPolylines.map((seg, idx) => (
         <Polyline
           key={idx}
           positions={seg.coords}
           pathOptions={{
             color: seg.color,
-            weight: 7,
-            opacity: 0.9,
+            weight: seg.isWalking ? 5 : 7,
+            opacity: seg.isWalking ? 0.7 : 0.9,
             lineCap: "round",
             lineJoin: "round",
+            dashArray: seg.isWalking ? "8, 12" : undefined,
           }}
         />
       ))}
@@ -237,11 +246,11 @@ export default function MapView({
               </div>
               <div style={{ fontSize: 12, color: "#475569" }}>{tp.stopName}</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
-                <span style={{ color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length], fontWeight: 700 }}>
+                <span style={{ color: SEGMENT_COLORS[tp.colorIdx % SEGMENT_COLORS.length], fontWeight: 700 }}>
                   Bus {tp.fromBus}
                 </span>
                 {" → "}
-                <span style={{ color: SEGMENT_COLORS[(idx + 1) % SEGMENT_COLORS.length], fontWeight: 700 }}>
+                <span style={{ color: SEGMENT_COLORS[(tp.colorIdx + 1) % SEGMENT_COLORS.length], fontWeight: 700 }}>
                   Bus {tp.toBus}
                 </span>
               </div>

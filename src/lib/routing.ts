@@ -1,5 +1,5 @@
 import { TransitGraph } from "./graph";
-import { GraphEdge, RouteResult, RouteSegment, OptimizationMode } from "./types";
+import { GraphEdge, RouteResult, RouteSegment, OptimizationMode, WALKING_EDGE_BUS_ID } from "./types";
 
 const TRANSFER_PENALTY_DISTANCE = 0.5; // km equivalent
 const TRANSFER_PENALTY_TIME = 5; // minutes
@@ -213,14 +213,17 @@ function reconstructRoute(
 
   const totalDistance = segments.reduce((sum, s) => sum + s.distance, 0);
   const totalTime = segments.reduce((sum, s) => sum + s.time, 0);
-  const totalStops = segments.reduce((sum, s) => sum + s.stops.length, 0) -
-    Math.max(0, segments.length - 1); // Don't double-count transfer stops
+  const busSegments = segments.filter((s) => s.busId !== WALKING_EDGE_BUS_ID);
+  const totalStops = busSegments.reduce((sum, s) => sum + s.stops.length, 0) -
+    Math.max(0, busSegments.length - 1);
+  // Transfers = number of bus changes (walking segments connect bus segments)
+  const totalTransfers = Math.max(0, busSegments.length - 1);
 
   return {
     segments,
     totalDistance: Math.round(totalDistance * 100) / 100,
     totalTime: Math.round(totalTime * 10) / 10,
-    totalTransfers: Math.max(0, segments.length - 1),
+    totalTransfers,
     totalStops,
   };
 }
