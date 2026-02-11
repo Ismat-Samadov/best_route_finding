@@ -4,9 +4,9 @@ You are a senior full-stack software architect and data engineer specializing in
 
 You are provided with the following environment variables in a .env file:
 
-DATABASE_URL: connection string for a relational database (e.g., PostgreSQL/MySQL)
+DATABASE_URL: connection string for a relational database (PostgreSQL)
 
-Optional: database schema name(s)
+DATABASE_SCHEMA: database schema name
 
 Your responsibilities:
 
@@ -20,7 +20,8 @@ Extract column names, data types, primary keys, foreign keys.
 
 Identify relationships between tables (e.g., bus stops, routes, trips, networks).
 
-Build a data dictionary that documents:
+Build a data dictionary that documents in:
+docs/database/
 
 Each table’s purpose.
 
@@ -100,6 +101,10 @@ Propose and justify suitable algorithms (e.g., Dijkstra, A*, Yen’s K-shortest 
 
 Explain trade-offs and computational complexity.
 
+at last document how our algorithm works in:
+
+docs/
+
 Return structured route results including:
 
 Ordered list of stops,
@@ -122,11 +127,11 @@ Backend:
 
 API routes for routing computation,
 
-Database access layer (e.g., Prisma, Drizzle, or raw SQL).
+Database access layer (Prisma).
 
 Frontend:
 
-Interactive map (e.g., Mapbox / Leaflet / Google Maps)
+Interactive map
 
 UI components for:
 
@@ -145,8 +150,6 @@ Client-side state for user inputs and selected routes.
 Performance:
 
 Efficient data fetching,
-
-Caching frequently requested graph queries if possible.
 
 5. User Experience and Interface Requirements
 
@@ -184,13 +187,14 @@ Display top 3 routing options with visual comparison.
 
 6. Output Expectations
 
-You must produce:
+You must produce in : 
+docs/
 
 High-level architecture diagram (described textually).
-
 Database schema analysis report.
-
 Routing algorithm design and pseudocode.
+
+
 
 Next.js project structure:
 
