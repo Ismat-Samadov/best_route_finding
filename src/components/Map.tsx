@@ -48,6 +48,23 @@ interface MapViewProps {
   route: RouteResult | null;
   userLocation: { lat: number; lng: number } | null;
   onStopClick: (stop: StopDetail) => void;
+  isVisible?: boolean;
+}
+
+function InvalidateSize({ isVisible }: { isVisible?: boolean }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (isVisible) {
+      // Small delay to let the container finish its display transition
+      const timer = setTimeout(() => {
+        map.invalidateSize();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [map, isVisible]);
+
+  return null;
 }
 
 function FitBounds({
@@ -94,6 +111,7 @@ export default function MapView({
   route,
   userLocation,
   onStopClick,
+  isVisible,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
 
@@ -160,6 +178,7 @@ export default function MapView({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
+      <InvalidateSize isVisible={isVisible} />
       <FitBounds fromStop={fromStop} toStop={toStop} route={route} />
 
       {/* All bus stops — larger, more visible */}

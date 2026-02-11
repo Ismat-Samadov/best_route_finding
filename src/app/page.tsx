@@ -176,6 +176,7 @@ export default function Home() {
           route={route}
           userLocation={userLocation}
           onStopClick={handleMapStopClick}
+          isVisible={mobileView === "map"}
         />
       </div>
 
