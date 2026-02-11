@@ -50,6 +50,10 @@ export default function Home() {
         return;
       }
       setRoutes(data.routes);
+      // On mobile, auto-collapse sidebar to show the map with route
+      if (window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      }
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -204,12 +208,19 @@ export default function Home() {
       </aside>
 
       {/* Mobile toggle */}
-      <button className="mobile-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+      <button
+        className="mobile-toggle"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label={sidebarOpen ? "Close panel" : "Open search"}
+      >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           {sidebarOpen ? (
             <path d="M6 18L18 6M6 6l12 12" />
           ) : (
-            <path d="M3 12h18M3 6h18M3 18h18" />
+            <>
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </>
           )}
         </svg>
       </button>
