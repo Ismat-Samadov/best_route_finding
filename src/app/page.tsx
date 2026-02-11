@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import StopSearch from "@/components/StopSearch";
-import RouteResults from "@/components/RouteResults";
+import JourneyCard from "@/components/JourneyCard";
 import LocationButton from "@/components/LocationButton";
-import type { StopDetail, RouteResult, OptimizationMode } from "@/lib/types";
+import type { StopDetail, RouteResult } from "@/lib/types";
 
 const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -13,9 +13,7 @@ export default function Home() {
   const [stops, setStops] = useState<StopDetail[]>([]);
   const [fromStop, setFromStop] = useState<StopDetail | null>(null);
   const [toStop, setToStop] = useState<StopDetail | null>(null);
-  const [routes, setRoutes] = useState<RouteResult[]>([]);
-  const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
-  const [mode, setMode] = useState<OptimizationMode>("balanced");
+  const [route, setRoute] = useState<RouteResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{
@@ -31,25 +29,24 @@ export default function Home() {
       .catch(() => setError("Failed to load bus stops"));
   }, []);
 
-  const handleFindRoutes = useCallback(async () => {
+  const handleFindRoute = useCallback(async () => {
     if (!fromStop || !toStop) return;
     setLoading(true);
     setError(null);
-    setRoutes([]);
-    setSelectedRouteIdx(0);
+    setRoute(null);
 
     try {
       const res = await fetch("/api/routes/find", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fromStopId: fromStop.id, toStopId: toStop.id, mode }),
+        body: JSON.stringify({ fromStopId: fromStop.id, toStopId: toStop.id }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Route finding failed");
         return;
       }
-      setRoutes(data.routes);
+      setRoute(data.route);
       // On mobile, auto-collapse sidebar to show the map with route
       if (window.innerWidth < 1024) {
         setSidebarOpen(false);
@@ -59,7 +56,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [fromStop, toStop, mode]);
+  }, [fromStop, toStop]);
 
   const handleLocationFound = useCallback(
     (lat: number, lng: number) => {
@@ -91,7 +88,7 @@ export default function Home() {
       } else {
         setFromStop(stop);
         setToStop(null);
-        setRoutes([]);
+        setRoute(null);
       }
     },
     [fromStop, toStop]
@@ -101,14 +98,8 @@ export default function Home() {
     const temp = fromStop;
     setFromStop(toStop);
     setToStop(temp);
-    setRoutes([]);
+    setRoute(null);
   }, [fromStop, toStop]);
-
-  const modes: Array<{ value: OptimizationMode; label: string; icon: string }> = [
-    { value: "balanced", label: "Balanced", icon: "⚖️" },
-    { value: "shortest", label: "Shortest", icon: "📏" },
-    { value: "fastest", label: "Fastest", icon: "⚡" },
-  ];
 
   return (
     <div className="app-layout">
@@ -158,37 +149,20 @@ export default function Home() {
             />
           </div>
 
-          {/* Mode */}
-          <div className="form-section">
-            <div className="form-label">Optimization Mode</div>
-            <div className="mode-grid">
-              {modes.map(({ value, label, icon }) => (
-                <button
-                  key={value}
-                  className={`mode-btn ${mode === value ? "active" : ""}`}
-                  onClick={() => setMode(value)}
-                >
-                  <span className="icon">{icon}</span>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Find Button */}
           <div className="form-section">
             <button
               className="primary-btn"
-              onClick={handleFindRoutes}
+              onClick={handleFindRoute}
               disabled={!fromStop || !toStop || loading}
             >
               {loading ? (
                 <>
                   <span className="spinner" />
-                  Computing routes...
+                  Finding best route...
                 </>
               ) : (
-                "Find Routes"
+                "Find Route"
               )}
             </button>
           </div>
@@ -196,14 +170,8 @@ export default function Home() {
           {/* Error */}
           {error && <div className="error-msg">{error}</div>}
 
-          {/* Results */}
-          {routes.length > 0 && (
-            <RouteResults
-              routes={routes}
-              selectedIndex={selectedRouteIdx}
-              onSelect={setSelectedRouteIdx}
-            />
-          )}
+          {/* Result */}
+          {route && <JourneyCard route={route} />}
         </div>
       </aside>
 
@@ -231,8 +199,7 @@ export default function Home() {
           stops={stops}
           fromStop={fromStop}
           toStop={toStop}
-          routes={routes}
-          selectedRouteIdx={selectedRouteIdx}
+          route={route}
           userLocation={userLocation}
           onStopClick={handleMapStopClick}
         />

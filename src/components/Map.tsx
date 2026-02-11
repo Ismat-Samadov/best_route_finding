@@ -18,16 +18,6 @@ const BAKU_CENTER: [number, number] = [40.4093, 49.8671];
 const DEFAULT_ZOOM = 12;
 
 // Fix Leaflet default icon issue in Next.js
-const DefaultIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
 const StartIcon = L.divIcon({
   className: "custom-stop-marker selected-start",
   iconSize: [18, 18],
@@ -40,14 +30,13 @@ const EndIcon = L.divIcon({
   iconAnchor: [9, 9],
 });
 
-const ROUTE_COLORS = ["#2563eb", "#f59e0b", "#10b981"];
+const ROUTE_COLOR = "#2563eb";
 
 interface MapViewProps {
   stops: StopDetail[];
   fromStop: StopDetail | null;
   toStop: StopDetail | null;
-  routes: RouteResult[];
-  selectedRouteIdx: number;
+  route: RouteResult | null;
   userLocation: { lat: number; lng: number } | null;
   onStopClick: (stop: StopDetail) => void;
 }
@@ -55,19 +44,16 @@ interface MapViewProps {
 function FitBounds({
   fromStop,
   toStop,
-  routes,
-  selectedRouteIdx,
+  route,
 }: {
   fromStop: StopDetail | null;
   toStop: StopDetail | null;
-  routes: RouteResult[];
-  selectedRouteIdx: number;
+  route: RouteResult | null;
 }) {
   const map = useMap();
 
   useEffect(() => {
-    if (routes.length > 0 && routes[selectedRouteIdx]) {
-      const route = routes[selectedRouteIdx];
+    if (route) {
       const allCoords: [number, number][] = [];
       for (const seg of route.segments) {
         for (const stop of seg.stops) {
@@ -87,7 +73,7 @@ function FitBounds({
     } else if (fromStop) {
       map.setView([fromStop.latitude, fromStop.longitude], 15);
     }
-  }, [map, fromStop, toStop, routes, selectedRouteIdx]);
+  }, [map, fromStop, toStop, route]);
 
   return null;
 }
@@ -96,42 +82,36 @@ export default function MapView({
   stops,
   fromStop,
   toStop,
-  routes,
-  selectedRouteIdx,
+  route,
   userLocation,
   onStopClick,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
 
   // Create route polyline coordinates
-  const routePolylines = useMemo(() => {
-    return routes.map((route, idx) => {
-      const coords: [number, number][] = [];
-      for (const seg of route.segments) {
-        for (const stop of seg.stops) {
-          coords.push([stop.latitude, stop.longitude]);
-        }
+  const routePolyline = useMemo(() => {
+    if (!route) return null;
+    const coords: [number, number][] = [];
+    for (const seg of route.segments) {
+      for (const stop of seg.stops) {
+        coords.push([stop.latitude, stop.longitude]);
       }
-      return {
-        coords,
-        color: ROUTE_COLORS[idx % ROUTE_COLORS.length],
-        isSelected: idx === selectedRouteIdx,
-      };
-    });
-  }, [routes, selectedRouteIdx]);
+    }
+    return coords;
+  }, [route]);
 
-  // Stop IDs used in selected route (for highlighting)
+  // Stop IDs used in route (for highlighting)
   const routeStopIds = useMemo(() => {
     const ids = new Set<number>();
-    if (routes[selectedRouteIdx]) {
-      for (const seg of routes[selectedRouteIdx].segments) {
+    if (route) {
+      for (const seg of route.segments) {
         for (const stop of seg.stops) {
           ids.add(stop.id);
         }
       }
     }
     return ids;
-  }, [routes, selectedRouteIdx]);
+  }, [route]);
 
   return (
     <MapContainer
@@ -146,12 +126,7 @@ export default function MapView({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      <FitBounds
-        fromStop={fromStop}
-        toStop={toStop}
-        routes={routes}
-        selectedRouteIdx={selectedRouteIdx}
-      />
+      <FitBounds fromStop={fromStop} toStop={toStop} route={route} />
 
       {/* All bus stops as circle markers */}
       {stops.map((stop) => {
@@ -159,7 +134,7 @@ export default function MapView({
         const isTo = toStop?.id === stop.id;
         const isOnRoute = routeStopIds.has(stop.id);
 
-        if (isFrom || isTo) return null; // Rendered separately with special icons
+        if (isFrom || isTo) return null;
 
         return (
           <CircleMarker
@@ -167,16 +142,8 @@ export default function MapView({
             center={[stop.latitude, stop.longitude]}
             radius={isOnRoute ? 7 : stop.is_transport_hub ? 6 : 4}
             pathOptions={{
-              color: isOnRoute
-                ? ROUTE_COLORS[selectedRouteIdx % ROUTE_COLORS.length]
-                : stop.is_transport_hub
-                ? "#f59e0b"
-                : "#2563eb",
-              fillColor: isOnRoute
-                ? ROUTE_COLORS[selectedRouteIdx % ROUTE_COLORS.length]
-                : stop.is_transport_hub
-                ? "#f59e0b"
-                : "#3b82f6",
+              color: isOnRoute ? ROUTE_COLOR : stop.is_transport_hub ? "#f59e0b" : "#2563eb",
+              fillColor: isOnRoute ? ROUTE_COLOR : stop.is_transport_hub ? "#f59e0b" : "#3b82f6",
               fillOpacity: isOnRoute ? 0.9 : 0.6,
               weight: isOnRoute ? 3 : 2,
             }}
@@ -186,18 +153,27 @@ export default function MapView({
           >
             <Popup className="stop-popup">
               <div>
-                <strong className="text-sm">{stop.name}</strong>
-                <div className="text-xs text-gray-500 mt-1">
+                <strong style={{ fontSize: 13 }}>{stop.name}</strong>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
                   Code: {stop.code}
                 </div>
                 {stop.is_transport_hub && (
-                  <div className="text-xs text-amber-600 mt-0.5 font-medium">
+                  <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 2, fontWeight: 500 }}>
                     Transport Hub
                   </div>
                 )}
                 <button
                   onClick={() => onStopClick(stop)}
-                  className="mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700"
+                  style={{
+                    marginTop: 6,
+                    fontSize: 11,
+                    background: "#2563eb",
+                    color: "white",
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: "none",
+                    cursor: "pointer",
+                  }}
                 >
                   Select Stop
                 </button>
@@ -209,25 +185,15 @@ export default function MapView({
 
       {/* From stop marker */}
       {fromStop && (
-        <Marker
-          position={[fromStop.latitude, fromStop.longitude]}
-          icon={StartIcon}
-        >
-          <Popup>
-            <strong>Start: {fromStop.name}</strong>
-          </Popup>
+        <Marker position={[fromStop.latitude, fromStop.longitude]} icon={StartIcon}>
+          <Popup><strong>Start: {fromStop.name}</strong></Popup>
         </Marker>
       )}
 
       {/* To stop marker */}
       {toStop && (
-        <Marker
-          position={[toStop.latitude, toStop.longitude]}
-          icon={EndIcon}
-        >
-          <Popup>
-            <strong>Destination: {toStop.name}</strong>
-          </Popup>
+        <Marker position={[toStop.latitude, toStop.longitude]} icon={EndIcon}>
+          <Popup><strong>Destination: {toStop.name}</strong></Popup>
         </Marker>
       )}
 
@@ -247,19 +213,17 @@ export default function MapView({
         </CircleMarker>
       )}
 
-      {/* Route polylines */}
-      {routePolylines.map((polyline, idx) => (
+      {/* Route polyline */}
+      {routePolyline && (
         <Polyline
-          key={idx}
-          positions={polyline.coords}
+          positions={routePolyline}
           pathOptions={{
-            color: polyline.color,
-            weight: polyline.isSelected ? 5 : 3,
-            opacity: polyline.isSelected ? 0.9 : 0.3,
-            dashArray: polyline.isSelected ? undefined : "8 8",
+            color: ROUTE_COLOR,
+            weight: 5,
+            opacity: 0.85,
           }}
         />
-      ))}
+      )}
     </MapContainer>
   );
 }
