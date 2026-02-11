@@ -154,6 +154,16 @@ html, body {
     max-height: calc(70vh - 80px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    scroll-padding-bottom: 80px;
+  }
+
+  /* When an input is focused (keyboard open), expand sidebar to use more screen */
+  .sidebar:has(input:focus) {
+    max-height: 85vh;
+  }
+
+  .sidebar:has(input:focus) .sidebar-body {
+    max-height: calc(85vh - 80px);
   }
 
   /* Larger touch targets on mobile */

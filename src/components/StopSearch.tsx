@@ -23,6 +23,8 @@ export default function StopSearch({
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return [];
@@ -47,11 +49,22 @@ export default function StopSearch({
     };
   }, []);
 
+  // Scroll dropdown into view when results appear (helps on mobile with keyboard)
+  useEffect(() => {
+    if (isOpen && filtered.length > 0 && dropdownRef.current) {
+      setTimeout(() => {
+        dropdownRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 100);
+    }
+  }, [isOpen, filtered.length]);
+
   const handleSelect = useCallback(
     (stop: StopDetail) => {
       onSelect(stop);
       setQuery("");
       setIsOpen(false);
+      // Blur input to close mobile keyboard
+      inputRef.current?.blur();
     },
     [onSelect]
   );
@@ -82,29 +95,36 @@ export default function StopSearch({
       ) : (
         <div>
           <input
+            ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setIsOpen(true);
             }}
-            onFocus={() => setIsOpen(true)}
+            onFocus={() => {
+              setIsOpen(true);
+              // On mobile, scroll input into view so keyboard doesn't cover it
+              setTimeout(() => {
+                inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 350);
+            }}
             placeholder={placeholder}
             className="search-input"
           />
 
           {isOpen && filtered.length > 0 && (
-            <div className="dropdown-inline">
+            <div ref={dropdownRef} className="dropdown-inline">
               {filtered.map((stop) => (
                 <button
                   key={stop.id}
                   className="dropdown-item"
                   onMouseDown={(e) => {
-                    e.preventDefault(); // Prevent blur/focus loss
+                    e.preventDefault();
                     handleSelect(stop);
                   }}
                   onTouchEnd={(e) => {
-                    e.preventDefault(); // Prevent ghost click
+                    e.preventDefault();
                     handleSelect(stop);
                   }}
                 >
