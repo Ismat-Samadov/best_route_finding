@@ -113,24 +113,24 @@ export default function Home() {
   }, [fromStop, toStop]);
 
   return (
-    <div className="h-screen flex flex-col md:flex-row overflow-hidden">
+    <div className="h-screen w-screen flex flex-col lg:flex-row overflow-hidden">
       {/* Sidebar */}
       <div
         className={`${
-          sidebarOpen ? "w-full md:w-[400px]" : "w-0"
-        } transition-all duration-300 bg-white border-r border-slate-200 flex flex-col z-10 shadow-lg md:shadow-none ${
-          sidebarOpen ? "max-h-[50vh] md:max-h-full" : "max-h-0 md:max-h-full"
-        } overflow-hidden`}
+          sidebarOpen ? "w-full lg:w-[420px] lg:min-w-[420px]" : "w-0 lg:w-0 lg:min-w-0"
+        } transition-all duration-300 bg-white border-r border-slate-200 flex flex-col z-10 shadow-lg lg:shadow-none ${
+          sidebarOpen ? "h-[45vh] lg:h-full" : "h-0 lg:h-full"
+        } overflow-hidden shrink-0`}
       >
         {/* Header */}
-        <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white shrink-0">
-          <h1 className="text-lg font-bold">Baku Bus Route Planner</h1>
-          <p className="text-blue-100 text-xs mt-0.5">
+        <div className="p-4 lg:p-5 bg-gradient-to-r from-blue-600 to-blue-700 text-white shrink-0">
+          <h1 className="text-lg lg:text-xl font-bold">Baku Bus Route Planner</h1>
+          <p className="text-blue-100 text-xs lg:text-sm mt-0.5">
             Find the best bus routes across Baku
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-4 lg:space-y-5">
           {/* Location Button */}
           <LocationButton onLocationFound={handleLocationFound} />
 
@@ -260,7 +260,7 @@ export default function Home() {
       {/* Mobile toggle */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="md:hidden fixed bottom-4 left-4 z-20 bg-blue-600 text-white p-3 rounded-full shadow-lg"
+        className="lg:hidden fixed bottom-4 left-4 z-20 bg-blue-600 text-white p-3 rounded-full shadow-lg"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           {sidebarOpen ? (
@@ -272,7 +272,7 @@ export default function Home() {
       </button>
 
       {/* Map */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0 lg:h-full">
         <MapView
           stops={stops}
           fromStop={fromStop}
