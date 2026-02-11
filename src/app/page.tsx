@@ -21,6 +21,7 @@ export default function Home() {
     lng: number;
   } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     fetch("/api/stops")
@@ -104,7 +105,7 @@ export default function Home() {
   return (
     <div className="app-layout">
       {/* Sidebar */}
-      <aside className={`sidebar ${!sidebarOpen ? "collapsed" : ""}`}>
+      <aside className={`sidebar ${!sidebarOpen ? "collapsed" : ""} ${searching ? "searching" : ""}`}>
         <div className="sidebar-header">
           <h1>Baku Bus Route Planner</h1>
           <p>Find the best bus routes across Baku</p>
@@ -125,6 +126,8 @@ export default function Home() {
               selectedStop={fromStop}
               onSelect={setFromStop}
               dotColor="green"
+              onSearchFocus={() => setSearching(true)}
+              onSearchBlur={() => setSearching(false)}
             />
           </div>
 
@@ -146,6 +149,8 @@ export default function Home() {
               selectedStop={toStop}
               onSelect={setToStop}
               dotColor="red"
+              onSearchFocus={() => setSearching(true)}
+              onSearchBlur={() => setSearching(false)}
             />
           </div>
 

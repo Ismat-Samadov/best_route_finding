@@ -2,6 +2,9 @@
 
 import type { RouteResult } from "@/lib/types";
 
+// Must match SEGMENT_COLORS in Map.tsx
+const SEGMENT_COLORS = ["#e11d48", "#7c3aed", "#059669", "#ea580c"];
+
 interface JourneyCardProps {
   route: RouteResult;
 }
@@ -45,35 +48,38 @@ export default function JourneyCard({ route }: JourneyCardProps) {
         </div>
 
         {/* Each bus segment */}
-        {route.segments.map((segment, idx) => (
-          <div key={idx}>
-            {/* Bus ride */}
-            <div className="timeline-row">
-              <div className="timeline-line" />
-              <div className="timeline-bus">
-                <span className="bus-number">Bus {segment.busNumber}</span>
-                <span className="bus-detail">
-                  {segment.stops.length} stops &middot; {segment.distance.toFixed(1)} km &middot; {Math.round(segment.time)} min
-                </span>
-              </div>
-            </div>
-
-            {/* Transfer or end */}
-            {idx < route.segments.length - 1 ? (
+        {route.segments.map((segment, idx) => {
+          const color = SEGMENT_COLORS[idx % SEGMENT_COLORS.length];
+          return (
+            <div key={idx}>
+              {/* Bus ride */}
               <div className="timeline-row">
-                <div className="timeline-dot transfer" />
-                <div className="timeline-content">
-                  <span className="timeline-stop-name">
-                    {segment.stops[segment.stops.length - 1]?.name}
-                  </span>
-                  <span className="timeline-label transfer-label">
-                    Transfer to Bus {route.segments[idx + 1]?.busNumber}
+                <div className="timeline-line" style={{ "--seg-color": color } as React.CSSProperties} />
+                <div className="timeline-bus" style={{ borderColor: color, background: `${color}10` }}>
+                  <span className="bus-number" style={{ color }}>Bus {segment.busNumber}</span>
+                  <span className="bus-detail">
+                    {segment.stops.length} stops &middot; {segment.distance.toFixed(1)} km &middot; {Math.round(segment.time)} min
                   </span>
                 </div>
               </div>
-            ) : null}
-          </div>
-        ))}
+
+              {/* Transfer */}
+              {idx < route.segments.length - 1 && (
+                <div className="timeline-row">
+                  <div className="timeline-dot transfer" />
+                  <div className="timeline-content">
+                    <span className="timeline-stop-name">
+                      {segment.stops[segment.stops.length - 1]?.name}
+                    </span>
+                    <span className="timeline-label transfer-label">
+                      Transfer to Bus {route.segments[idx + 1]?.busNumber}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {/* End point */}
         <div className="timeline-row">

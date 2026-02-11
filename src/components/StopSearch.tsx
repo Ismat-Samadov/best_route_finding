@@ -10,6 +10,8 @@ interface StopSearchProps {
   selectedStop: StopDetail | null;
   onSelect: (stop: StopDetail | null) => void;
   dotColor: "green" | "red";
+  onSearchFocus?: () => void;
+  onSearchBlur?: () => void;
 }
 
 export default function StopSearch({
@@ -19,6 +21,8 @@ export default function StopSearch({
   selectedStop,
   onSelect,
   dotColor,
+  onSearchFocus,
+  onSearchBlur,
 }: StopSearchProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -49,7 +53,7 @@ export default function StopSearch({
     };
   }, []);
 
-  // Scroll dropdown into view when results appear (helps on mobile with keyboard)
+  // Scroll dropdown into view when results appear
   useEffect(() => {
     if (isOpen && filtered.length > 0 && dropdownRef.current) {
       setTimeout(() => {
@@ -63,10 +67,10 @@ export default function StopSearch({
       onSelect(stop);
       setQuery("");
       setIsOpen(false);
-      // Blur input to close mobile keyboard
       inputRef.current?.blur();
+      onSearchBlur?.();
     },
-    [onSelect]
+    [onSelect, onSearchBlur]
   );
 
   return (
@@ -104,10 +108,16 @@ export default function StopSearch({
             }}
             onFocus={() => {
               setIsOpen(true);
-              // On mobile, scroll input into view so keyboard doesn't cover it
+              onSearchFocus?.();
               setTimeout(() => {
                 inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
               }, 350);
+            }}
+            onBlur={() => {
+              // Delay blur to allow dropdown tap to register
+              setTimeout(() => {
+                onSearchBlur?.();
+              }, 200);
             }}
             placeholder={placeholder}
             className="search-input"

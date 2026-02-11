@@ -13,24 +13,32 @@ import {
 } from "react-leaflet";
 import type { StopDetail, RouteResult } from "@/lib/types";
 
-// Baku center coordinates
 const BAKU_CENTER: [number, number] = [40.4093, 49.8671];
 const DEFAULT_ZOOM = 12;
 
-// Fix Leaflet default icon issue in Next.js
+// Distinct colors for each bus segment — NOT blue (avoids confusion with stop dots)
+const SEGMENT_COLORS = ["#e11d48", "#7c3aed", "#059669", "#ea580c"];
+
 const StartIcon = L.divIcon({
-  className: "custom-stop-marker selected-start",
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
+  className: "map-marker-start",
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  html: '<div class="marker-inner start-marker"></div>',
 });
 
 const EndIcon = L.divIcon({
-  className: "custom-stop-marker selected-end",
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
+  className: "map-marker-end",
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  html: '<div class="marker-inner end-marker"></div>',
 });
 
-const ROUTE_COLOR = "#2563eb";
+const TransferIcon = L.divIcon({
+  className: "map-marker-transfer",
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  html: '<div class="marker-inner transfer-marker"></div>',
+});
 
 interface MapViewProps {
   stops: StopDetail[];
@@ -62,14 +70,14 @@ function FitBounds({
       }
       if (allCoords.length > 0) {
         const bounds = L.latLngBounds(allCoords);
-        map.fitBounds(bounds, { padding: [50, 50] });
+        map.fitBounds(bounds, { padding: [60, 60] });
       }
     } else if (fromStop && toStop) {
       const bounds = L.latLngBounds([
         [fromStop.latitude, fromStop.longitude],
         [toStop.latitude, toStop.longitude],
       ]);
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [60, 60] });
     } else if (fromStop) {
       map.setView([fromStop.latitude, fromStop.longitude], 15);
     }
@@ -88,19 +96,37 @@ export default function MapView({
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
 
-  // Create route polyline coordinates
-  const routePolyline = useMemo(() => {
-    if (!route) return null;
-    const coords: [number, number][] = [];
-    for (const seg of route.segments) {
-      for (const stop of seg.stops) {
-        coords.push([stop.latitude, stop.longitude]);
-      }
-    }
-    return coords;
+  // Build per-segment polylines with distinct colors
+  const segmentPolylines = useMemo(() => {
+    if (!route) return [];
+    return route.segments.map((seg, idx) => {
+      const coords: [number, number][] = seg.stops.map((s) => [s.latitude, s.longitude]);
+      return {
+        coords,
+        color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
+        busNumber: seg.busNumber,
+      };
+    });
   }, [route]);
 
-  // Stop IDs used in route (for highlighting)
+  // Transfer points: where user changes buses
+  const transferPoints = useMemo(() => {
+    if (!route || route.segments.length <= 1) return [];
+    const points: Array<{ lat: number; lng: number; fromBus: string; toBus: string; stopName: string }> = [];
+    for (let i = 0; i < route.segments.length - 1; i++) {
+      const lastStop = route.segments[i].stops[route.segments[i].stops.length - 1];
+      points.push({
+        lat: lastStop.latitude,
+        lng: lastStop.longitude,
+        fromBus: route.segments[i].busNumber,
+        toBus: route.segments[i + 1].busNumber,
+        stopName: lastStop.name,
+      });
+    }
+    return points;
+  }, [route]);
+
+  // Stop IDs on the route (for highlighting)
   const routeStopIds = useMemo(() => {
     const ids = new Set<number>();
     if (route) {
@@ -128,51 +154,50 @@ export default function MapView({
 
       <FitBounds fromStop={fromStop} toStop={toStop} route={route} />
 
-      {/* All bus stops as circle markers */}
+      {/* All bus stops — larger, more visible */}
       {stops.map((stop) => {
         const isFrom = fromStop?.id === stop.id;
         const isTo = toStop?.id === stop.id;
-        const isOnRoute = routeStopIds.has(stop.id);
-
         if (isFrom || isTo) return null;
+
+        const isOnRoute = routeStopIds.has(stop.id);
 
         return (
           <CircleMarker
             key={stop.id}
             center={[stop.latitude, stop.longitude]}
-            radius={isOnRoute ? 7 : stop.is_transport_hub ? 6 : 4}
+            radius={isOnRoute ? 8 : stop.is_transport_hub ? 7 : 5}
             pathOptions={{
-              color: isOnRoute ? ROUTE_COLOR : stop.is_transport_hub ? "#f59e0b" : "#2563eb",
-              fillColor: isOnRoute ? ROUTE_COLOR : stop.is_transport_hub ? "#f59e0b" : "#3b82f6",
-              fillOpacity: isOnRoute ? 0.9 : 0.6,
-              weight: isOnRoute ? 3 : 2,
+              color: "white",
+              fillColor: isOnRoute ? "#0f172a" : stop.is_transport_hub ? "#f59e0b" : "#64748b",
+              fillOpacity: isOnRoute ? 1 : 0.7,
+              weight: isOnRoute ? 2.5 : 1.5,
             }}
-            eventHandlers={{
-              click: () => onStopClick(stop),
-            }}
+            eventHandlers={{ click: () => onStopClick(stop) }}
           >
             <Popup className="stop-popup">
               <div>
-                <strong style={{ fontSize: 13 }}>{stop.name}</strong>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                <strong style={{ fontSize: 14 }}>{stop.name}</strong>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
                   Code: {stop.code}
                 </div>
                 {stop.is_transport_hub && (
-                  <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 2, fontWeight: 500 }}>
+                  <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 2, fontWeight: 600 }}>
                     Transport Hub
                   </div>
                 )}
                 <button
                   onClick={() => onStopClick(stop)}
                   style={{
-                    marginTop: 6,
-                    fontSize: 11,
+                    marginTop: 8,
+                    fontSize: 12,
                     background: "#2563eb",
                     color: "white",
-                    padding: "4px 10px",
-                    borderRadius: 6,
+                    padding: "6px 14px",
+                    borderRadius: 8,
                     border: "none",
                     cursor: "pointer",
+                    fontWeight: 600,
                   }}
                 >
                   Select Stop
@@ -183,14 +208,56 @@ export default function MapView({
         );
       })}
 
-      {/* From stop marker */}
+      {/* Route polylines — each segment a different bold color */}
+      {segmentPolylines.map((seg, idx) => (
+        <Polyline
+          key={idx}
+          positions={seg.coords}
+          pathOptions={{
+            color: seg.color,
+            weight: 7,
+            opacity: 0.9,
+            lineCap: "round",
+            lineJoin: "round",
+          }}
+        />
+      ))}
+
+      {/* Transfer point markers — large, distinctive */}
+      {transferPoints.map((tp, idx) => (
+        <Marker
+          key={`transfer-${idx}`}
+          position={[tp.lat, tp.lng]}
+          icon={TransferIcon}
+        >
+          <Popup>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                Transfer Point
+              </div>
+              <div style={{ fontSize: 12, color: "#475569" }}>{tp.stopName}</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                <span style={{ color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length], fontWeight: 700 }}>
+                  Bus {tp.fromBus}
+                </span>
+                {" → "}
+                <span style={{ color: SEGMENT_COLORS[(idx + 1) % SEGMENT_COLORS.length], fontWeight: 700 }}>
+                  Bus {tp.toBus}
+                </span>
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+
+      {/* Start marker */}
       {fromStop && (
         <Marker position={[fromStop.latitude, fromStop.longitude]} icon={StartIcon}>
           <Popup><strong>Start: {fromStop.name}</strong></Popup>
         </Marker>
       )}
 
-      {/* To stop marker */}
+      {/* Destination marker */}
       {toStop && (
         <Marker position={[toStop.latitude, toStop.longitude]} icon={EndIcon}>
           <Popup><strong>Destination: {toStop.name}</strong></Popup>
@@ -211,18 +278,6 @@ export default function MapView({
         >
           <Popup>Your location</Popup>
         </CircleMarker>
-      )}
-
-      {/* Route polyline */}
-      {routePolyline && (
-        <Polyline
-          positions={routePolyline}
-          pathOptions={{
-            color: ROUTE_COLOR,
-            weight: 5,
-            opacity: 0.85,
-          }}
-        />
       )}
     </MapContainer>
   );
