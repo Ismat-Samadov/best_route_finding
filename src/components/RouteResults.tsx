@@ -9,25 +9,23 @@ interface RouteResultsProps {
   onSelect: (index: number) => void;
 }
 
-export default function RouteResults({
-  routes,
-  selectedIndex,
-  onSelect,
-}: RouteResultsProps) {
+export default function RouteResults({ routes, selectedIndex, onSelect }: RouteResultsProps) {
   const labels = ["Best Route", "Alternative 1", "Alternative 2"];
-  const colors = ["blue", "amber", "emerald"] as const;
+  const badges = ["blue", "amber", "emerald"] as const;
+  const cardClasses = ["", "alt-1", "alt-2"];
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+    <div>
+      <div className="form-label" style={{ marginTop: 8 }}>
         {routes.length} route{routes.length > 1 ? "s" : ""} found
-      </h2>
+      </div>
       {routes.map((route, idx) => (
         <RouteCard
           key={idx}
           route={route}
           label={labels[idx] || `Route ${idx + 1}`}
-          color={colors[idx % colors.length]}
+          badgeColor={badges[idx % badges.length]}
+          cardClass={cardClasses[idx] || ""}
           isSelected={idx === selectedIndex}
           onSelect={() => onSelect(idx)}
         />

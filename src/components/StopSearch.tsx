@@ -8,8 +8,8 @@ interface StopSearchProps {
   placeholder: string;
   stops: StopDetail[];
   selectedStop: StopDetail | null;
-  onSelect: (stop: StopDetail) => void;
-  markerColor: "green" | "red";
+  onSelect: (stop: StopDetail | null) => void;
+  dotColor: "green" | "red";
 }
 
 export default function StopSearch({
@@ -18,7 +18,7 @@ export default function StopSearch({
   stops,
   selectedStop,
   onSelect,
-  markerColor,
+  dotColor,
 }: StopSearchProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -29,11 +29,7 @@ export default function StopSearch({
     if (!query.trim()) return [];
     const q = query.toLowerCase();
     return stops
-      .filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.code.toLowerCase().includes(q)
-      )
+      .filter((s) => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
       .slice(0, 30);
   }, [query, stops]);
 
@@ -52,38 +48,31 @@ export default function StopSearch({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const colorDot =
-    markerColor === "green"
-      ? "bg-emerald-500"
-      : "bg-red-500";
-
   return (
-    <div className="relative">
-      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-        <span className={`w-2.5 h-2.5 rounded-full ${colorDot}`} />
+    <div>
+      <div className="form-label">
+        <span className={`dot ${dotColor}`} />
         {label}
-      </label>
+      </div>
 
       {selectedStop ? (
-        <div className="mt-1 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-          <span className="flex-1 text-sm font-medium truncate">
-            {selectedStop.name}
-          </span>
-          <span className="text-xs text-slate-400">{selectedStop.code}</span>
+        <div className="selected-stop">
+          <span className="stop-name">{selectedStop.name}</span>
+          <span className="stop-code">{selectedStop.code}</span>
           <button
+            className="clear-btn"
             onClick={() => {
-              onSelect(null as unknown as StopDetail);
+              onSelect(null);
               setQuery("");
             }}
-            className="text-slate-400 hover:text-slate-600 ml-1"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
       ) : (
-        <div className="relative mt-1">
+        <div style={{ position: "relative" }}>
           <input
             ref={inputRef}
             type="text"
@@ -94,10 +83,10 @@ export default function StopSearch({
             }}
             onFocus={() => setIsOpen(true)}
             placeholder={placeholder}
-            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+            className="search-input"
           />
           <svg
-            className="absolute right-3 top-3 text-slate-400"
+            style={{ position: "absolute", right: 14, top: 14, color: "#94a3b8" }}
             width="14"
             height="14"
             viewBox="0 0 24 24"
@@ -110,31 +99,26 @@ export default function StopSearch({
           </svg>
 
           {isOpen && filtered.length > 0 && (
-            <div
-              ref={dropdownRef}
-              className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-            >
+            <div ref={dropdownRef} className="dropdown">
               {filtered.map((stop) => (
                 <button
                   key={stop.id}
+                  className="dropdown-item"
                   onClick={() => {
                     onSelect(stop);
                     setQuery("");
                     setIsOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b border-slate-50 last:border-0"
                 >
-                  <div className="text-sm font-medium text-slate-800 truncate">
-                    {stop.name}
-                  </div>
-                  <div className="text-xs text-slate-400">{stop.code}</div>
+                  <div className="name">{stop.name}</div>
+                  <div className="code">{stop.code}</div>
                 </button>
               ))}
             </div>
           )}
 
           {isOpen && query.trim() && filtered.length === 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-sm text-slate-500">
+            <div className="dropdown" style={{ padding: 14, fontSize: 13, color: "#64748b" }}>
               No stops found for &quot;{query}&quot;
             </div>
           )}

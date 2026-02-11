@@ -6,19 +6,14 @@ interface LocationButtonProps {
   onLocationFound: (lat: number, lng: number) => void;
 }
 
-export default function LocationButton({
-  onLocationFound,
-}: LocationButtonProps) {
-  const [status, setStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
+export default function LocationButton({ onLocationFound }: LocationButtonProps) {
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   const handleClick = () => {
     if (!navigator.geolocation) {
       setStatus("error");
       return;
     }
-
     setStatus("loading");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -34,53 +29,24 @@ export default function LocationButton({
     );
   };
 
+  const cls = `location-btn ${status === "success" ? "success" : ""} ${status === "error" ? "error" : ""}`;
+
   return (
-    <button
-      onClick={handleClick}
-      disabled={status === "loading"}
-      className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-        status === "success"
-          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-          : status === "error"
-          ? "bg-red-50 text-red-700 border border-red-200"
-          : "bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
-      }`}
-    >
+    <button className={cls} onClick={handleClick} disabled={status === "loading"}>
       {status === "loading" ? (
         <>
-          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-              fill="none"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
+          <span className="spinner" style={{ borderColor: "rgba(0,0,0,0.15)", borderTopColor: "#2563eb", width: 16, height: 16 }} />
           Detecting location...
         </>
       ) : status === "success" ? (
         <>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           Location found! Nearest stop selected.
         </>
       ) : status === "error" ? (
-        <>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M15 9l-6 6M9 9l6 6" />
-          </svg>
-          Location access denied
-        </>
+        "Location access denied"
       ) : (
         <>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
