@@ -14,7 +14,13 @@
     "type": "git",
     "url": "git+https://github.com/Ismat-Samadov/best_route_finding.git"
   },
-  "keywords": ["baku", "bus", "route", "planner", "transport"],
+  "keywords": [
+    "baku",
+    "bus",
+    "route",
+    "planner",
+    "transport"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
@@ -35,7 +41,9 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
-    "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
   }
 }

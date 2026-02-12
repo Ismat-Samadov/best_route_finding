@@ -9,6 +9,20 @@ import type { StopDetail, RouteResult } from "@/lib/types";
 
 const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
 
+const MOBILE_BREAKPOINT = 768;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
+
 export default function Home() {
   const [stops, setStops] = useState<StopDetail[]>([]);
   const [fromStop, setFromStop] = useState<StopDetail | null>(null);
@@ -22,6 +36,7 @@ export default function Home() {
   } | null>(null);
   // Mobile: "search" = form panel, "map" = map panel
   const [mobileView, setMobileView] = useState<"search" | "map">("search");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetch("/api/stops")
@@ -103,7 +118,7 @@ export default function Home() {
   return (
     <div className="app-layout">
       {/* Sidebar / Form panel */}
-      <aside className={`sidebar ${mobileView !== "search" ? "hidden-view" : ""}`}>
+      <aside className={`sidebar${isMobile && mobileView !== "search" ? " hidden-view" : ""}`}>
         <div className="sidebar-header">
           <h1>Baku Bus Route Planner</h1>
           <p>Find the best bus routes across Baku</p>
@@ -168,7 +183,7 @@ export default function Home() {
       </aside>
 
       {/* Map panel */}
-      <div className={`map-wrapper ${mobileView !== "map" ? "hidden-view" : ""}`}>
+      <div className={`map-wrapper${isMobile && mobileView !== "map" ? " hidden-view" : ""}`}>
         <MapView
           stops={stops}
           fromStop={fromStop}
@@ -176,7 +191,7 @@ export default function Home() {
           route={route}
           userLocation={userLocation}
           onStopClick={handleMapStopClick}
-          isVisible={mobileView === "map"}
+          isVisible={!isMobile || mobileView === "map"}
         />
       </div>
 
