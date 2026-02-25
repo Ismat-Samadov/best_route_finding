@@ -64,28 +64,55 @@ npm start
 ## Project Structure
 
 ```
-src/
-├── app/
-│   ├── page.tsx                    # Main page with map and controls
-│   ├── layout.tsx                  # Root layout
-│   ├── globals.css                 # Global styles
-│   └── api/
-│       ├── stops/route.ts          # GET /api/stops
-│       ├── stops/nearby/route.ts   # GET /api/stops/nearby
-│       ├── buses/route.ts          # GET /api/buses
-│       ├── routes/find/route.ts    # POST /api/routes/find
-│       └── routes/geometry/route.ts # GET /api/routes/geometry
-├── lib/
-│   ├── db.ts                       # Database queries
-│   ├── graph.ts                    # Transit graph with walking edges
-│   ├── routing.ts                  # Dijkstra + Yen's algorithms
-│   ├── geo.ts                      # Haversine distance calculations
-│   └── types.ts                    # TypeScript type definitions
-└── components/
-    ├── Map.tsx                     # Interactive Leaflet map with route visualization
-    ├── StopSearch.tsx              # Stop search autocomplete
-    ├── JourneyCard.tsx             # Route timeline with bus/walk segments
-    └── LocationButton.tsx          # Geolocation button
+best_route_finding/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx                    # Main page with map and controls
+│   │   ├── layout.tsx                  # Root layout
+│   │   ├── globals.css                 # Global styles
+│   │   └── api/
+│   │       ├── stops/route.ts          # GET /api/stops
+│   │       ├── stops/nearby/route.ts   # GET /api/stops/nearby
+│   │       ├── buses/route.ts          # GET /api/buses
+│   │       ├── routes/find/route.ts    # POST /api/routes/find
+│   │       └── routes/geometry/route.ts # GET /api/routes/geometry
+│   ├── lib/
+│   │   ├── db.ts                       # Database queries
+│   │   ├── graph.ts                    # Transit graph with walking edges
+│   │   ├── routing.ts                  # Dijkstra + Yen's algorithms
+│   │   ├── geo.ts                      # Haversine distance calculations
+│   │   └── types.ts                    # TypeScript type definitions
+│   └── components/
+│       ├── Map.tsx                     # Interactive Leaflet map with route visualization
+│       ├── StopSearch.tsx              # Stop search autocomplete
+│       ├── JourneyCard.tsx             # Route timeline with bus/walk segments
+│       └── LocationButton.tsx          # Geolocation button
+├── scripts/
+│   ├── stops.py                    # Scraper: fetch all bus stops
+│   ├── busDetails.py               # Scraper: fetch bus routes and coordinates
+│   ├── db_utils.py                 # Shared DB connection utilities
+│   ├── run_migrations.py           # Apply database migrations
+│   ├── check-schemas.js            # JS utility: inspect DB schemas
+│   ├── inspect-data.js             # JS utility: inspect JSON data
+│   └── inspect-db.js               # JS utility: inspect DB contents
+├── migrations/
+│   └── 001_initial_schema.sql      # PostgreSQL schema (ayna schema)
+├── .github/
+│   └── workflows/
+│       └── scrape-data.yml         # GitHub Actions: scrape every 3 hours
+├── docs/
+│   ├── scraping/                   # Scraping infrastructure docs
+│   │   ├── stops.md
+│   │   ├── busDetails.md
+│   │   ├── db_utils.md
+│   │   └── run_migrations.md
+│   ├── architecture.md
+│   ├── routing-algorithm.md
+│   ├── deployment.md
+│   └── database/
+│       ├── schema-analysis.md
+│       └── data-dictionary.md
+└── requirements.txt                # Python dependencies for scrapers
 ```
 
 ## API Reference
@@ -210,6 +237,61 @@ Deploy to Vercel in one click:
 3. Deploy
 
 See [docs/deployment.md](docs/deployment.md) for full deployment guide.
+
+## Scraping Infrastructure
+
+This repo also contains the automated data pipeline that keeps the PostgreSQL database fresh.
+
+### Overview
+
+Python scripts fetch data from the [Ayna Transport API](https://map-api.ayna.gov.az) and insert it into PostgreSQL. A GitHub Actions workflow runs the scrapers every 3 hours automatically.
+
+### Setup
+
+```bash
+# Install Python dependencies
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Configure database
+echo "DATABASE_URL=postgresql://user:password@host:port/database?sslmode=require" > .env
+
+# Create schema
+python scripts/run_migrations.py
+
+# Fetch data
+python scripts/stops.py
+python scripts/busDetails.py
+```
+
+### Scripts
+
+| Script | Description |
+|--------|-------------|
+| `scripts/stops.py` | Fetches 3,841 bus stops from API, truncates and reloads `ayna.stops` |
+| `scripts/busDetails.py` | Fetches 208 bus routes with stops and coordinates (~127K total records) |
+| `scripts/db_utils.py` | Shared database connection pooling and query helpers |
+| `scripts/run_migrations.py` | Applies `migrations/001_initial_schema.sql` to create the `ayna` schema |
+
+### Automated Scraping (GitHub Actions)
+
+The workflow at `.github/workflows/scrape-data.yml` runs on schedule (`0 */3 * * *`) and on manual trigger:
+
+1. **Job 1 – Scrape Stops:** runs `stops.py`, uploads logs as artifact
+2. **Job 2 – Scrape Bus Details:** runs `busDetails.py` after Job 1 succeeds
+3. **Job 3 – Notify:** reports overall success/failure
+
+**Required secret:** Add `DATABASE_URL` to the repository's **Settings → Secrets and variables → Actions**.
+
+### Scraping Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/scraping/stops.md](docs/scraping/stops.md) | Stops scraper |
+| [docs/scraping/busDetails.md](docs/scraping/busDetails.md) | Bus details scraper |
+| [docs/scraping/db_utils.md](docs/scraping/db_utils.md) | Database utilities |
+| [docs/scraping/run_migrations.md](docs/scraping/run_migrations.md) | Migration runner |
 
 ## Documentation
 
