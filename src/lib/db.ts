@@ -119,8 +119,7 @@ export async function queryRoutesByBusAndDirection(
 
 export async function getDataLastUpdated(): Promise<string | null> {
   const sql = getSQL();
-  const schema = process.env.DATABASE_SCHEMA?.toLowerCase() || "ayna";
-  const rows = await sql`SELECT MAX(created_at) AS last_updated FROM ${sql(schema)}.buses`;
+  const rows = await sql`SELECT MAX(created_at) AS last_updated FROM ayna.buses`;
   const val = rows[0]?.last_updated;
   return val ? new Date(val).toISOString() : null;
 }
