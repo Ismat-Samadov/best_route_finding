@@ -116,3 +116,11 @@ export async function queryRoutesByBusAndDirection(
   `;
   return rows.length > 0 ? (rows[0].id as number) : null;
 }
+
+export async function getDataLastUpdated(): Promise<string | null> {
+  const sql = getSQL();
+  const schema = process.env.DATABASE_SCHEMA?.toLowerCase() || "ayna";
+  const rows = await sql`SELECT MAX(created_at) AS last_updated FROM ${sql(schema)}.buses`;
+  const val = rows[0]?.last_updated;
+  return val ? new Date(val).toISOString() : null;
+}

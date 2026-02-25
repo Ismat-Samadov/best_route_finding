@@ -11,6 +11,16 @@ const MapView = dynamic(() => import("@/components/Map"), { ssr: false });
 
 const MOBILE_BREAKPOINT = 768;
 
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -36,6 +46,7 @@ export default function Home() {
   } | null>(null);
   // Mobile: "search" = form panel, "map" = map panel
   const [mobileView, setMobileView] = useState<"search" | "map">("search");
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -43,6 +54,11 @@ export default function Home() {
       .then((r) => r.json())
       .then((data) => setStops(data.stops || []))
       .catch(() => setError("Failed to load bus stops"));
+
+    fetch("/api/data-status")
+      .then((r) => r.json())
+      .then((data) => setLastUpdated(data.lastUpdated ?? null))
+      .catch(() => {});
   }, []);
 
   const handleFindRoute = useCallback(async () => {
@@ -122,6 +138,15 @@ export default function Home() {
         <div className="sidebar-header">
           <h1>Baku Bus Route Planner</h1>
           <p>Find the best bus routes across Baku</p>
+          {lastUpdated && (
+            <p className="data-freshness">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" strokeWidth="2.5" style={{flexShrink: 0}}>
+                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+              </svg>
+              Data updated {formatRelativeTime(lastUpdated)}
+            </p>
+          )}
         </div>
 
         <div className="sidebar-body">

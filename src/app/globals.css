@@ -59,6 +59,15 @@ html, body {
   color: #bfdbfe;
 }
 
+.data-freshness {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #93c5fd;
+  margin-top: 5px;
+}
+
 .sidebar-body {
   flex: 1;
   overflow-y: auto;
